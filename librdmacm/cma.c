@@ -74,23 +74,6 @@ do {						\
 	(req)->response = (uintptr_t) (resp);	\
 } while (0)
 
-struct cma_port {
-	uint8_t			link_layer;
-};
-
-struct cma_device {
-	struct ibv_context *verbs;
-	struct ibv_pd	   *pd;
-	struct ibv_xrcd    *xrcd;
-	struct cma_port    *port;
-	__be64		    guid;
-	int		    port_cnt;
-	int		    refcnt;
-	int		    max_qpsize;
-	uint8_t		    max_initiator_depth;
-	uint8_t		    max_responder_resources;
-};
-
 struct cma_id_private {
 	struct rdma_cm_id	id;
 	struct cma_device	*cma_dev;
@@ -480,6 +463,12 @@ match:
 	id_priv->cma_dev = cma_dev;
 	id_priv->id.verbs = cma_dev->verbs;
 	id_priv->id.pd = cma_dev->pd;
+
+	ret = ece_init_cm(cma_dev);
+	if (ret) {
+		ibv_dealloc_pd(cma_dev->pd);
+		--cma_dev->refcnt;
+	}
 out:
 	pthread_mutex_unlock(&mut);
 	return ret;
@@ -489,6 +478,8 @@ static void ucma_put_device(struct cma_device *cma_dev)
 {
 	pthread_mutex_lock(&mut);
 	if (!--cma_dev->refcnt) {
+		ece_close_cm(cma_dev);
+
 		ibv_dealloc_pd(cma_dev->pd);
 		if (cma_dev->xrcd)
 			ibv_close_xrcd(cma_dev->xrcd);
@@ -615,6 +606,7 @@ static int rdma_create_id2(struct rdma_event_channel *channel,
 	id_priv->handle = resp.id;
 	ucma_insert_id(id_priv);
 	*id = &id_priv->id;
+
 	return 0;
 
 err:	ucma_free_id(id_priv);
@@ -656,6 +648,7 @@ int rdma_destroy_id(struct rdma_cm_id *id)
 	int ret;
 
 	id_priv = container_of(id, struct cma_id_private, id);
+
 	ret = ucma_destroy_kern_id(id->channel->fd, id_priv->handle);
 	if (ret < 0)
 		return ret;

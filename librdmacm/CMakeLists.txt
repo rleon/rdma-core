@@ -14,11 +14,13 @@ rdma_library(rdmacm librdmacm.map
   acm.c
   addrinfo.c
   cma.c
+  ece.c
   indexer.c
   rsocket.c
   )
 target_link_libraries(rdmacm LINK_PUBLIC ibverbs)
 target_link_libraries(rdmacm LINK_PRIVATE
+  ibumad
   ${NL_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   ${RT_LIBRARIES}

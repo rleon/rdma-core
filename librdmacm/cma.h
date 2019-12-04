@@ -114,4 +114,29 @@ struct ib_connect_hdr {
 #define cma_dst_ip6 dst_addr[0]
 };
 
+struct cma_port {
+	uint8_t			link_layer;
+};
+
+struct cma_ece {
+	int portfd;
+	uint32_t agent;
+};
+
+struct cma_device {
+	struct ibv_context *verbs;
+	struct ibv_pd	   *pd;
+	struct ibv_xrcd    *xrcd;
+	struct cma_port    *port;
+	__be64		    guid;
+	int		    port_cnt;
+	int		    refcnt;
+	int		    max_qpsize;
+	uint8_t		    max_initiator_depth;
+	uint8_t		    max_responder_resources;
+	struct cma_ece     *ece;
+};
+
+int ece_init_cm(struct cma_device *dev);
+void ece_close_cm(struct cma_device *dev);
 #endif /* CMA_H */
