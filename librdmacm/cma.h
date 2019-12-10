@@ -139,4 +139,6 @@ struct cma_device {
 
 int ece_init_cm(struct cma_device *dev);
 void ece_close_cm(struct cma_device *dev);
+int ece_request_cap(struct cma_device *dev, uint8_t port_num);
+int ece_reply_cap(struct cma_device *dev, uint8_t port_num);
 #endif /* CMA_H */

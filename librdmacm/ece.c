@@ -100,3 +100,78 @@ void ece_close_cm(struct cma_device *dev)
 	free(dev->ece);
 	dev->ece = NULL;
 }
+
+#define get_data_ptr(mad) ((void *) ((mad).hdr.data))
+static int send_classportinfo(struct cma_ece *ece, uint8_t method)
+{
+	struct umad_class_port_info *cpi;
+	struct ib_user_mad umad = {};
+	struct umad_packet *out_mad = (void *)umad.data;
+	int ret;
+
+	out_mad->mad_hdr.base_version = UMAD_BASE_VERSION;
+	out_mad->mad_hdr.method = method;
+	out_mad->mad_hdr.attr_id = UMAD_ATTR_CLASS_PORT_INFO;
+	out_mad->mad_hdr.attr_mod = htobe32(1 >> 13);
+	out_mad->mad_hdr.mgmt_class = UMAD_CLASS_CM;
+	out_mad->mad_hdr.class_version = UMAD_CM_CLASS_VERSION;
+
+	/* TOOD: configure timeout */
+	ret = umad_send(ece->portfd, ece->agent, &umad, sizeof(umad), 100, 0);
+	printf("%s ret = %d\n", __func__, ret);
+	return ret;
+}
+
+static int recv_classportinfo(struct cma_ece *ece)
+{
+	struct umad_class_port_info *cpi;
+	struct ib_user_mad umad;
+	int length;
+	int ret;
+
+	/* TODO: connfigure timeout */
+	ret = umad_recv(ece->portfd, &umad, &length, 100);
+	printf("%s ret = %d\n", __func__, ret);
+	return ret;
+}
+
+int ece_request_cap(struct cma_device *dev, uint8_t port_num)
+{
+	int ret;
+
+	if (!dev->ece)
+		return 0;
+
+	printf("%s\n", __func__);
+
+	/* CM GET CAP, CM SET CAP back, send options, recv, options */
+	ret = send_classportinfo(&dev->ece[port_num - 1], UMAD_METHOD_GET);
+	ret = recv_classportinfo(&dev->ece[port_num - 1]);
+	if (ret == -ETIMEDOUT)
+		/* Working against old librdmacm without ECE */
+		return 0;
+
+	return ret;
+}
+
+int ece_reply_cap(struct cma_device *dev, uint8_t port_num)
+{
+	int ret;
+
+	if (!dev->ece)
+		return 0;
+
+	printf("%s\n", __func__);
+
+	ret = recv_classportinfo(&dev->ece[port_num - 1]);
+	if (ret == -ETIMEDOUT) {
+		/*
+		 * We didn't recieve ECE CM_GET, no need to send back
+		 * anything. Continue in legacy mode,
+		 */
+		return 0;
+	}
+	ret = send_classportinfo(&dev->ece[port_num - 1], UMAD_METHOD_SEND);
+
+	return ret;
+}

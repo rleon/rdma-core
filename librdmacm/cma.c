@@ -1561,7 +1561,12 @@ int rdma_connect(struct rdma_cm_id *id, struct rdma_conn_param *conn_param)
 		id_priv->connect_len = 0;
 	}
 
-	return ucma_complete(id);
+	ret = ucma_complete(id);
+	if (ret)
+		return ret;
+
+	ret = ece_request_cap(id_priv->cma_dev, id->port_num);
+	return ret;
 }
 
 int rdma_listen(struct rdma_cm_id *id, int backlog)
@@ -1655,6 +1660,8 @@ int rdma_accept(struct rdma_cm_id *id, struct rdma_conn_param *conn_param)
 	} else {
 		id_priv->responder_resources = conn_param->responder_resources;
 	}
+
+	ret = ece_reply_cap(id_priv->cma_dev, id->port_num);
 
 	if (!ucma_is_ud_qp(id->qp_type)) {
 		ret = ucma_modify_qp_rtr(id, id_priv->responder_resources);
